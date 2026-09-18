@@ -1,0 +1,665 @@
+// Gran Central - esquema de datos del e-commerce
+//
+// Convenciones:
+// - Todo importe se guarda como Decimal(12,2) en ARS. Nunca Float: en pesos los
+//   tickets son grandes y el redondeo binario se nota.
+// - Los productos no se borran, se archivan: las órdenes viejas tienen que poder
+//   seguir referenciándolos.
+// - Las órdenes guardan una copia de nombre, SKU y precio. Si mañana el admin
+//   cambia el precio, las ventas históricas no se tienen que mover.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// En Prisma 7 la URL ya no va acá: la lee prisma.config.ts para las
+// migraciones, y en runtime la toma el driver adapter en src/lib/prisma.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Usuarios y roles (compatible con el adapter de Auth.js)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  phone         String?
+  dni           String?
+  role          Role      @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  addresses Address[]
+  orders    Order[]
+  carts     Cart[]
+  auditLogs AuditLog[]
+
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Rastro de quién tocó qué en el panel. En un e-commerce con varios usuarios
+// admin, saber quién cambió un precio evita discusiones.
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Direcciones
+// ---------------------------------------------------------------------------
+
+enum Province {
+  CABA
+  BUENOS_AIRES
+  CATAMARCA
+  CHACO
+  CHUBUT
+  CORDOBA
+  CORRIENTES
+  ENTRE_RIOS
+  FORMOSA
+  JUJUY
+  LA_PAMPA
+  LA_RIOJA
+  MENDOZA
+  MISIONES
+  NEUQUEN
+  RIO_NEGRO
+  SALTA
+  SAN_JUAN
+  SAN_LUIS
+  SANTA_CRUZ
+  SANTA_FE
+  SANTIAGO_DEL_ESTERO
+  TIERRA_DEL_FUEGO
+  TUCUMAN
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  label      String?
+  recipient  String
+  phone      String
+  dni        String?
+  street     String
+  number     String
+  apartment  String?
+  city       String
+  province   Province
+  postalCode String
+  notes      String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo
+// ---------------------------------------------------------------------------
+
+// Árbol de categorías: Living > Sillones > Esquineros.
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  imageUrl    String?
+  parentId    String?
+  position    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent     Category?   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Category[]  @relation("CategoryTree")
+  products   Product[]
+  promotions Promotion[] @relation("PromotionCategories")
+
+  @@index([parentId])
+  @@index([slug])
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Product {
+  id               String        @id @default(cuid())
+  name             String
+  slug             String        @unique
+  description      String?       @db.Text
+  shortDescription String?
+  categoryId       String?
+  brand            String?
+  status           ProductStatus @default(DRAFT)
+  isFeatured       Boolean       @default(false)
+  // Campos de SEO: lo que se ve en Google y en la preview de WhatsApp.
+  metaTitle        String?
+  metaDescription  String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  archivedAt       DateTime?
+
+  category   Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images     ProductImage[]
+  options    ProductOption[]
+  variants   ProductVariant[]
+  promotions Promotion[]      @relation("PromotionProducts")
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([slug])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  // ID que devuelve Cloudinary. Sin esto no se puede borrar el archivo del CDN
+  // cuando el admin quita la imagen, y el storage se llena de huérfanos.
+  publicId  String?
+  alt       String?
+  position  Int     @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// Opciones y valores permiten filtrar por color o medida en la grilla de
+// categoría, que es lo que hace usable un catálogo de muebles.
+model ProductOption {
+  id        String @id @default(cuid())
+  productId String
+  name      String // "Tapizado", "Medida", "Terminación"
+  position  Int    @default(0)
+
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  @@unique([productId, name])
+}
+
+model ProductOptionValue {
+  id       String @id @default(cuid())
+  optionId String
+  value    String // "Chenille gris", "3 cuerpos"
+  position Int    @default(0)
+
+  option   ProductOption    @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variants ProductVariant[] @relation("VariantOptionValues")
+
+  @@unique([optionId, value])
+}
+
+model ProductVariant {
+  id             String   @id @default(cuid())
+  productId      String
+  sku            String   @unique
+  name           String
+  price          Decimal  @db.Decimal(12, 2)
+  // Precio tachado. Si está cargado y es mayor a price, el producto está en oferta.
+  compareAtPrice Decimal? @db.Decimal(12, 2)
+  costPrice      Decimal? @db.Decimal(12, 2)
+  stock          Int      @default(0)
+  // Permite vender sobre pedido, que en muebles a medida es lo habitual.
+  allowBackorder Boolean  @default(false)
+  isActive       Boolean  @default(true)
+
+  // Logística: un ropero no entra en Andreani. Estos campos deciden qué
+  // métodos de envío se ofrecen en el checkout.
+  weightKg         Decimal? @db.Decimal(8, 2)
+  lengthCm         Int?
+  widthCm          Int?
+  heightCm         Int?
+  isOversized      Boolean  @default(false)
+  requiresAssembly Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionValues ProductOptionValue[] @relation("VariantOptionValues")
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  movements    InventoryMovement[]
+
+  @@index([productId])
+  @@index([sku])
+}
+
+enum MovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  CANCELLATION
+}
+
+model InventoryMovement {
+  id        String       @id @default(cuid())
+  variantId String
+  type      MovementType
+  quantity  Int // negativo para salidas
+  reason    String?
+  orderId   String?
+  createdAt DateTime     @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Ofertas y cupones
+// ---------------------------------------------------------------------------
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// Campañas con fecha: "Semana del Living -20%". Se aplican a productos o
+// categorías enteras, así el admin no tiene que editar producto por producto.
+model Promotion {
+  id        String       @id @default(cuid())
+  name      String
+  type      DiscountType
+  value     Decimal      @db.Decimal(12, 2)
+  startsAt  DateTime
+  endsAt    DateTime
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  products   Product[]  @relation("PromotionProducts")
+  categories Category[] @relation("PromotionCategories")
+
+  @@index([isActive, startsAt, endsAt])
+}
+
+model Coupon {
+  id           String       @id @default(cuid())
+  code         String       @unique
+  type         DiscountType
+  value        Decimal      @db.Decimal(12, 2)
+  minPurchase  Decimal?     @db.Decimal(12, 2)
+  usageLimit   Int?
+  usedCount    Int          @default(0)
+  perUserLimit Int?
+  startsAt     DateTime?
+  expiresAt    DateTime?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  orders Order[]
+
+  @@index([code])
+}
+
+// ---------------------------------------------------------------------------
+// Envíos
+// ---------------------------------------------------------------------------
+
+enum ShippingMethodType {
+  CARRIER // Andreani, OCA, Correo Argentino vía agregador
+  OWN_DELIVERY // flete propio, para muebles grandes
+  PICKUP // retiro en showroom
+}
+
+// Zona de cobertura. Se define por provincia y/o por prefijos de código postal,
+// que es como se cotiza un flete en la práctica.
+model ShippingZone {
+  id          String     @id @default(cuid())
+  name        String
+  provinces   Province[]
+  postalCodes String[]
+  isActive    Boolean    @default(true)
+  position    Int        @default(0)
+
+  rates ShippingRate[]
+}
+
+model ShippingRate {
+  id               String             @id @default(cuid())
+  zoneId           String
+  name             String // "Flete Gran Rosario", "Retiro en showroom"
+  methodType       ShippingMethodType
+  price            Decimal            @db.Decimal(12, 2)
+  // Envío gratis a partir de este monto. Null = nunca.
+  freeOverAmount   Decimal?           @db.Decimal(12, 2)
+  estimatedDaysMin Int?
+  estimatedDaysMax Int?
+  maxWeightKg      Decimal?           @db.Decimal(8, 2)
+  // Si es false, este método desaparece del checkout cuando el carrito tiene
+  // algún ítem marcado como isOversized.
+  allowsOversized  Boolean            @default(false)
+  includesAssembly Boolean            @default(false)
+  isActive         Boolean            @default(true)
+
+  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+}
+
+// ---------------------------------------------------------------------------
+// Carrito
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String    @id @default(cuid())
+  userId    String?
+  // Para visitantes sin cuenta, guardado en cookie.
+  token     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  variantId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+}
+
+// ---------------------------------------------------------------------------
+// Órdenes
+// ---------------------------------------------------------------------------
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  IN_PROCESS
+  APPROVED
+  REJECTED
+  REFUNDED
+  CHARGED_BACK
+  CANCELLED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  RETURNED
+}
+
+model Order {
+  id     String @id @default(cuid())
+  // Número legible para hablar con el cliente por teléfono o WhatsApp.
+  number Int    @unique @default(autoincrement())
+
+  userId String?
+  email  String
+  phone  String
+
+  status            OrderStatus       @default(PENDING)
+  paymentStatus     PaymentStatus     @default(PENDING)
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @default(0) @db.Decimal(12, 2)
+  shippingTotal Decimal @default(0) @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
+  currency      String  @default("ARS")
+
+  couponId     String?
+  customerNote String?
+  adminNote    String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+
+  user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  coupon    Coupon?        @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items     OrderItem[]
+  payments  Payment[]
+  shipment  Shipment?
+  addresses OrderAddress[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+// Copia congelada de la dirección al momento de comprar. Si el cliente después
+// edita o borra su dirección, la orden no cambia.
+enum AddressKind {
+  SHIPPING
+  BILLING
+}
+
+model OrderAddress {
+  id         String      @id @default(cuid())
+  orderId    String
+  kind       AddressKind
+  recipient  String
+  phone      String
+  dni        String?
+  street     String
+  number     String
+  apartment  String?
+  city       String
+  province   Province
+  postalCode String
+  notes      String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, kind])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  variantId String?
+
+  // Snapshot: lo que el cliente realmente compró y a qué precio.
+  productName String
+  variantName String
+  sku         String
+  imageUrl    String?
+  unitPrice   Decimal @db.Decimal(12, 2)
+  quantity    Int
+  lineTotal   Decimal @db.Decimal(12, 2)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Pagos
+// ---------------------------------------------------------------------------
+
+enum PaymentProvider {
+  MERCADO_PAGO
+  BANK_TRANSFER
+  CASH_ON_PICKUP
+}
+
+model Payment {
+  id       String          @id @default(cuid())
+  orderId  String
+  provider PaymentProvider
+  status   PaymentStatus   @default(PENDING)
+  amount   Decimal         @db.Decimal(12, 2)
+
+  // Datos que devuelve Mercado Pago.
+  externalId    String?
+  preferenceId  String?
+  paymentMethod String? // "visa", "rapipago", "account_money"
+  installments  Int?
+  // Comisión que se llevó la pasarela. Sirve para el reporte de rentabilidad.
+  feeAmount     Decimal? @db.Decimal(12, 2)
+  netAmount     Decimal? @db.Decimal(12, 2)
+
+  // Para transferencia: comprobante que sube el cliente y quién lo aprobó.
+  receiptUrl String?
+  reviewedBy String?
+  reviewedAt DateTime?
+
+  rawPayload Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([externalId])
+}
+
+// Mercado Pago reintenta los webhooks y manda duplicados. Sin esta tabla,
+// terminás descontando stock dos veces por la misma venta.
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  externalId  String
+  type        String
+  payload     Json
+  processedAt DateTime?
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, externalId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Envío de la orden
+// ---------------------------------------------------------------------------
+
+enum ShipmentStatus {
+  PENDING
+  READY_TO_SHIP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+model Shipment {
+  id             String             @id @default(cuid())
+  orderId        String             @unique
+  methodType     ShippingMethodType
+  methodName     String
+  carrier        String?
+  trackingNumber String?
+  trackingUrl    String?
+  cost           Decimal            @db.Decimal(12, 2)
+  status         ShipmentStatus     @default(PENDING)
+  // En flete propio se coordina día de entrega con el cliente.
+  scheduledFor   DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Configuración de la tienda
+// ---------------------------------------------------------------------------
+
+// Clave/valor para lo que el admin tiene que poder cambiar sin tocar código:
+// descuento por transferencia, CBU y alias, umbral de envío gratis, whatsapp
+// de contacto, textos legales.
+model StoreSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
