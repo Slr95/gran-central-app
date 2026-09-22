@@ -3,7 +3,7 @@ import { listSaleProducts } from '@/lib/catalog'
 
 export const metadata = {
   title: 'Ofertas',
-  description: 'Muebles en oferta con precio tachado.',
+  description: 'Colchones, sommiers y almohadas en oferta con precio tachado.',
 }
 
 export default async function OffersPage() {

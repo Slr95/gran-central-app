@@ -64,9 +64,11 @@ const inputClass =
 export function ProductForm({
   initialValues,
   categories,
+  cloudinaryReady,
 }: {
   initialValues: ProductFormValues
   categories: Array<{ id: string; name: string }>
+  cloudinaryReady: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -247,7 +249,11 @@ export function ProductForm({
       <section className="rounded-xl border border-brand-100 bg-white p-6">
         <h2 className="font-semibold">Imágenes</h2>
         <div className="mt-4">
-          <ImageUploader images={values.images} onChange={(images) => set('images', images)} />
+          <ImageUploader
+            images={values.images}
+            cloudinaryReady={cloudinaryReady}
+            onChange={(images) => set('images', images)}
+          />
         </div>
       </section>
 
@@ -256,7 +262,7 @@ export function ProductForm({
           <div>
             <h2 className="font-semibold">Variantes y precios</h2>
             <p className="mt-1 text-sm text-muted">
-              Una variante por combinación de color y medida. Si el producto es único, dejá una sola.
+              Una variante por medida. Si el producto es único, dejá una sola.
             </p>
           </div>
           <button
@@ -280,7 +286,7 @@ export function ProductForm({
                     <input
                       value={variant.name}
                       onChange={(event) => setVariant(index, { name: event.target.value })}
-                      placeholder="Chenille gris - 3 cuerpos"
+                      placeholder="2 plazas 140 × 190 cm"
                       className={inputClass}
                     />
                     {errorFor(`variants.${index}.name`) && (

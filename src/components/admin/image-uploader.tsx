@@ -9,9 +9,11 @@ import type { ProductImageInput } from '@/lib/validations/product'
 export function ImageUploader({
   images,
   onChange,
+  cloudinaryReady,
 }: {
   images: ProductImageInput[]
   onChange: (images: ProductImageInput[]) => void
+  cloudinaryReady: boolean
 }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +102,7 @@ export function ImageUploader({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || !cloudinaryReady}
           className="flex size-28 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-brand-200 text-muted hover:border-brand-400 hover:text-brand-600 disabled:opacity-60"
         >
           {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
@@ -121,6 +123,20 @@ export function ImageUploader({
         La primera imagen es la que se ve en la grilla y en la preview de WhatsApp. Usá el hover para
         reordenar o quitar.
       </p>
+      {!cloudinaryReady && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Falta configurar Cloudinary. En{' '}
+          <a
+            href="https://console.cloudinary.com/console"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium underline"
+          >
+            console.cloudinary.com
+          </a>{' '}
+          copiá Cloud name, API Key y API Secret al .env (y a Vercel).
+        </p>
+      )}
 
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
     </div>

@@ -71,7 +71,7 @@ export async function placeOrder(_prev: { error?: string } | undefined, formData
   }
 
   if (hasOversized && !rate.allowsOversized) {
-    return { error: 'El carrito tiene un mueble grande que no entra en ese envío.' }
+    return { error: 'El carrito tiene un colchón o sommier que no entra en ese envío.' }
   }
 
   if (parsed.data.paymentProvider === 'CASH_ON_PICKUP' && rate.methodType !== 'PICKUP') {

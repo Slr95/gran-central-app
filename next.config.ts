@@ -2,7 +2,7 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   images: {
-    // Las fotos de muebles se sirven desde un CDN externo. Agregar acá cada
+    // Las fotos de producto se sirven desde un CDN externo. Agregar acá cada
     // host nuevo; Next no optimiza imágenes de dominios no declarados.
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },

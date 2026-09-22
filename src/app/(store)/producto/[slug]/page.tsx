@@ -111,7 +111,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </div>
         {product.variants.some((variant) => variant.isOversized) && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Este mueble es voluminoso: el envío se cotiza con flete propio o retiro en showroom.
+            Este producto es voluminoso: el envío se cotiza con flete propio o retiro en showroom.
           </p>
         )}
         {product.description && (

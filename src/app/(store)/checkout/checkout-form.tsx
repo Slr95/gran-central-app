@@ -91,7 +91,7 @@ export function CheckoutForm({
         <h2 className="font-semibold">Envío</h2>
         {hasOversized && (
           <p className="mt-2 text-sm text-amber-800">
-            Hay un mueble voluminoso: solo aparecen métodos que aceptan bultos grandes.
+            Hay un bulto voluminoso: solo aparecen métodos que aceptan colchones y sommiers.
           </p>
         )}
         <div className="mt-4 space-y-3">

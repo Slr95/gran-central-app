@@ -14,7 +14,7 @@ export async function generateMetadata({
   if (!category) return { title: 'Categoría' }
   return {
     title: category.name,
-    description: category.description ?? `Muebles de ${category.name} en Gran Central.`,
+    description: category.description ?? `${category.name} en Gran Central.`,
   }
 }
 

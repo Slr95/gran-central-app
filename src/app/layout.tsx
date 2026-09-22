@@ -9,11 +9,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Gran Central | Muebles para tu casa',
+    default: 'Gran Central | Colchones, sommiers y almohadas',
     template: '%s | Gran Central',
   },
   description:
-    'Muebles de living, dormitorio y comedor. Envíos a todo el país, cuotas y retiro en showroom.',
+    'Colchones, sommiers y almohadas. Envíos a todo el país, cuotas y retiro en showroom.',
   // Sin esto, compartir un producto por WhatsApp no muestra foto ni precio,
   // que es de donde va a venir buena parte del tráfico.
   openGraph: {

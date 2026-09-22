@@ -11,7 +11,7 @@ export const CLOUDINARY_FOLDER = 'gran-central/productos'
 
 /**
  * Firma una subida para que el navegador suba el archivo directo a Cloudinary.
- * El archivo nunca pasa por nuestro servidor: las fotos de muebles son pesadas
+ * El archivo nunca pasa por nuestro servidor: las fotos de producto son pesadas
  * y el límite de body de una serverless function es de pocos MB.
  */
 export function signUpload(timestamp: number) {

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { emptyVariant, ProductForm } from '@/components/admin/product-form'
+import { isCloudinaryConfigured } from '@/lib/cloudinary'
 import { prisma } from '@/lib/prisma'
 
 export const metadata = { title: 'Nuevo producto' }
@@ -21,6 +22,7 @@ export default async function NewProductPage() {
       <div className="mt-8">
         <ProductForm
           categories={categories}
+          cloudinaryReady={isCloudinaryConfigured()}
           initialValues={{
             name: '',
             slug: '',

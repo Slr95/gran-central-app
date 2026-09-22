@@ -16,7 +16,7 @@ export default async function HomePage() {
     <>
       <section className="rounded-2xl bg-brand-700 px-8 py-16 text-white">
         <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
-          Muebles que duran, precios que cierran
+          Colchones, sommiers y almohadas al precio justo
         </h1>
         <p className="mt-4 max-w-xl text-brand-100">
           Envíos a todo el país, cuotas con tarjeta y descuento pagando por transferencia.

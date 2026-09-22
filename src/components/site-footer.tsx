@@ -10,7 +10,7 @@ export async function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
           <p className="text-lg font-bold text-brand-700">Gran Central</p>
-          <p className="mt-2 text-sm text-muted">Muebles para living, dormitorio, comedor y oficina.</p>
+          <p className="mt-2 text-sm text-muted">Colchones, sommiers y almohadas. Envíos a todo el país.</p>
         </div>
         <div>
           <p className="text-sm font-semibold">Comprar</p>
